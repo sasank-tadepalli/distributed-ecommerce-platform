@@ -22,7 +22,7 @@
 |---|---|
 | Start date | 2026-11-15 |
 | Target MVP date | ~2027-03-07 (16 weeks; expect it to slip a little, and that's fine) |
-| Repo | _(add GitHub link)_ |
+| Repo | [github.com/sasank-tadepalli/distributed-ecommerce-platform](https://github.com/sasank-tadepalli/distributed-ecommerce-platform) |
 | Stack | Java 21, Spring Boot, Gradle (Kotlin DSL), PostgreSQL, Flyway, Redis, Kafka, Docker Compose, Testcontainers, Prometheus, Grafana, OpenTelemetry |
 | Weekly time | ~6 h (weekdays 30–60 min, weekends 60–90 min) |
 
