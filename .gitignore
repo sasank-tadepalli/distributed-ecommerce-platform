@@ -1,0 +1,34 @@
+# ─── OS files ──────────────────────────────────────────
+# macOS Finder metadata, created in every folder you open
+.DS_Store
+
+# ─── IDEs / editors ────────────────────────────────────
+# IntelliJ IDEA: project settings, module files, compiler output
+.idea/
+*.iml
+out/
+
+# VS Code: workspace settings and Java extension compile output
+.vscode/
+bin/
+
+# ─── Build tools (Gradle) ──────────────────────────────
+# Compiled classes, test reports and jars
+build/
+# Local Gradle cache (machine-specific)
+.gradle/
+# NOTE: never ignore *.jar, because gradle/wrapper/gradle-wrapper.jar must be committed
+
+# ─── Secrets / environment ─────────────────────────────
+# Real credentials live in .env files; only the template is committed
+.env
+.env.*
+!.env.example
+
+# ─── Logs ──────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Tooling ───────────────────────────────────────────
+# Claude Code personal settings (shared settings in .claude/ can still be committed)
+.claude/settings.local.json
