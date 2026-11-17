@@ -62,6 +62,23 @@ There is deliberately **no shared "common" library for domain code**. Services s
 
 How each session runs: concept first (why it exists and what problem it solves), then a small task with acceptance criteria, then I write the code, then a code review (correctness, Spring idioms, what a senior reviewer would flag). Each session ends with **one interview-style question**, answered in my own words in the journal.
 
+### Java concepts, taught when needed
+There are no standalone Java lessons. Each concept is explained the first time the service code needs it, with a short explanation and a JavaScript comparison when that helps:
+
+| Java concept | First needed for | Week |
+|---|---|---|
+| Annotations, classes, packages | First controller, Spring beans | 1–2 |
+| Interfaces, dependency injection | Service and repository layers | 2 |
+| Records | Request/response DTOs | 2 |
+| Exceptions (checked vs unchecked) | Global error handling | 2 |
+| Generics, collections | Repositories, `List<T>`, `Page<T>` | 2–3 |
+| `Optional` | `findById` and "not found" handling | 3 |
+| `equals`/`hashCode` | JPA entities | 3 |
+| Lambdas, streams | Mapping entities to DTOs, filtering permissions | 3–4 |
+| Enums | User status, roles, order states | 3–4 |
+| Concurrency, threads, `volatile`, atomic types | Optimistic locking test, executors | 7 |
+| `CompletableFuture`, virtual threads | Parallel calls, load testing | 10+ |
+
 ---
 
 ## 3. Phases and milestones
@@ -69,13 +86,15 @@ How each session runs: concept first (why it exists and what problem it solves),
 ### Phase 0: Foundations (Week 1)
 | Day | Task | Concept you learn |
 |---|---|---|
-| Mon | Install JDK 21 (SDKMAN), IntelliJ Community, `.gitignore`, first commit, GitHub repo | JDK vs JRE, LTS, git hygiene |
-| Tue | Java refresher for a Node dev: classes, interfaces, records, generics, Optional, streams | Static typing; how Java differs from JS |
-| Wed | Java refresher 2: exceptions, collections, `var`, lambdas. Write small exercises in a scratch file | Checked vs unchecked exceptions |
-| Thu | Create `docker-compose.yml` with Postgres, `.env`/`.env.example`, an `init.sql` with per-service DB roles, and a Makefile | Least privilege, Twelve-Factor config, container networking |
-| Fri | Gradle basics: create the root multi-project build and version catalog | Build tools, dependency management, multi-project builds |
-| Sat | Generate users-service from start.spring.io (Web, JPA, Postgres, Flyway, Validation, Actuator, Security later). Run it and hit `/actuator/health` | What Spring Boot auto-configuration does |
+| Mon | Install JDK 21 (SDKMAN), `.gitignore`, monorepo skeleton, architecture docs, first commit, GitHub repo | JDK vs JRE, LTS, git hygiene, C4 model |
+| Tue | Create `docker-compose.yml` with Postgres, `.env`/`.env.example`, and an `init.sql` with per-service DB roles | Least privilege, Twelve-Factor config, container networking, healthchecks |
+| Wed | Add a Makefile, then prove isolation: connect as `users_svc` and confirm it **can't** open `products_db` | Make targets, Postgres roles and privileges |
+| Thu | Gradle basics: create the root multi-project build and version catalog, plus the Gradle wrapper | Build tools, dependency management, multi-project builds |
+| Fri | Generate users-service from start.spring.io (Web, JPA, Postgres, Flyway, Validation, Actuator). Connect it to `users_db` and hit `/actuator/health` | What Spring Boot auto-configuration does |
+| Sat | Head start on Week 2: first REST endpoint and a first look at dependency injection | Annotations, beans, the request lifecycle |
 | Sun | ADR-001 (service split), ADR-002 (Java 21 + Gradle). **LinkedIn post #1** | Writing decision records |
+
+Java itself has no dedicated sessions; see [Java concepts, taught when needed](#java-concepts-taught-when-needed).
 
 ### Phase 1: Users & Auth Service, done properly (Weeks 2–5)
 - **Week 2: Spring core + REST.** IoC/DI and beans (compared to Node's `require`), controller → service → repository layers, DTOs vs entities, Bean Validation, global error handling with `@RestControllerAdvice` returning RFC 7807 `ProblemDetail`, profiles (`application-local.yml`).

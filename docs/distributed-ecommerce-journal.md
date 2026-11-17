@@ -210,4 +210,4 @@ Read alongside the week that uses it, not all up front.
 
 ---
 
-*Last updated: 2026-11-15 · Current: Week 1, Day 1 done → next: Day 2 (Java for Node developers)*
+*Last updated: 2026-11-15 · Current: Week 1, Day 1 done → next: Day 2 (Docker Compose + Postgres with per-service roles)*
