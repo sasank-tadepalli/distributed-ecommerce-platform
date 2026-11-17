@@ -23,6 +23,7 @@ A production-style, distributed e-commerce backend built with **Java 21** and **
 ├── infra/           # local infrastructure config (postgres, redis, kafka, prometheus, grafana)
 └── docs/
     ├── roadmap/     # learning and build plan
+    ├── notes/       # concept notes by topic (Java, Docker, Postgres, …)
     ├── adr/         # architecture decision records
     ├── architecture/# system diagrams
     ├── db/          # database conventions and schemas
