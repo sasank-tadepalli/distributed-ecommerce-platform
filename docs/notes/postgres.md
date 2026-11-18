@@ -29,6 +29,16 @@ CREATE ROLE users_svc LOGIN PASSWORD :'users_pw';    -- :'var' inserts it as a q
 ```
 `:var` inserts the raw value, and `:'var'` inserts it as a safely quoted string literal.
 
+⚠️ **Two silent failures combine here:**
+1. `\getenv` does **nothing** if the environment variable doesn't exist. There's no error.
+2. If a psql variable isn't set, `:'users_pw'` is left as **literal text**, and Postgres reports `syntax error at or near ":"`.
+
+So that syntax error really means "the env var never reached the container". Bug I hit: compose had `USER_DB_PASSWORD:` (missing `S`) on the left side of `environment:`, so the container never got `USERS_DB_PASSWORD`. Check what a container actually received, printing names only:
+```bash
+docker compose run --rm postgres env | grep DB_PASSWORD | cut -d= -f1
+```
+⚠️ After a **failed** init, `initdb` has already run, so a plain restart skips init forever. Reset with `docker compose down -v`.
+
 ## Useful `psql` meta-commands
 | Command | Shows |
 |---|---|
