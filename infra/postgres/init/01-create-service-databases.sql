@@ -13,3 +13,7 @@ CREATE ROLE orders_svc LOGIN PASSWORD :'orders_db_pwd';
 CREATE DATABASE users_db OWNER users_svc;
 CREATE DATABASE products_db OWNER products_svc;
 CREATE DATABASE orders_db OWNER orders_svc;
+
+REVOKE ALL ON DATABASE users_db FROM PUBLIC;
+REVOKE ALL ON DATABASE products_db FROM PUBLIC;
+REVOKE ALL ON DATABASE orders_db FROM PUBLIC;

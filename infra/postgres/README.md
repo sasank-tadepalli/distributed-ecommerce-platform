@@ -2,7 +2,7 @@
 
 Local PostgreSQL 17 for development. It runs from the root [`docker-compose.yml`](../../docker-compose.yml).
 
-**Database per service:** each service gets its own database, owned by its own login role. A service role is not a superuser and can't create roles or databases.
+**Database per service:** each service gets its own database, owned by its own login role. A service role is not a superuser and can't create roles or databases. It also **can't connect to any other service's database**: Postgres grants `CONNECT` to `PUBLIC` (every role) by default, so the init script runs `REVOKE ALL ON DATABASE … FROM PUBLIC` for each database.
 
 | Database | Owner role | Used by | Password variable |
 |---|---|---|---|
@@ -33,21 +33,21 @@ A variable's name has to match in all three places (`.env`, the left side of `en
 Scripts in `init/` run **only when the data volume is empty**, i.e. on the very first start. The same applies to every password. After editing the init script or changing a password in `.env`, reset:
 
 ```bash
-docker compose down -v    # ⚠️ deletes all local database data
-docker compose up -d
+make reset    # ⚠️ deletes all local database data (asks for confirmation)
 ```
 
 If an init script fails partway, a plain restart skips init entirely, so reset the same way.
 
 ## Common commands
 
-```bash
-docker compose up -d                       # start
-docker compose ps                          # wait for (healthy)
-docker compose logs postgres               # check the init script ran without errors
+Run `make` from the repo root to see all targets.
 
-# psql as admin (replace with your POSTGRES_USER / POSTGRES_DB values)
-docker compose exec postgres psql -U <admin-user> -d <admin-db>
+```bash
+make up              # start
+make ps              # wait for (healthy)
+make logs            # check the init script ran without errors
+make psql            # psql as admin
+make psql-users      # psql as users_svc into users_db (also psql-products, psql-orders)
 ```
 
 Inside `psql`: `\l` lists databases and owners, `\du` lists roles, `\c users_db` switches database, `\q` quits.
@@ -61,4 +61,5 @@ To connect from a GUI client (IntelliJ Database tool, DBeaver, TablePlus): host 
 | `database files are incompatible with server … initialized by PostgreSQL version N` | An old volume from a different Postgres major version is being reused | `docker compose down -v` (or migrate the data with `pg_dump`/`pg_upgrade` if it matters) |
 | `syntax error at or near ":"` during init | A `*_DB_PASSWORD` variable didn't reach the container | Check the names: `docker compose run --rm postgres env \| grep DB_PASSWORD \| cut -d= -f1` |
 | Changed a password in `.env` and it doesn't work | Passwords are only applied on first init | `down -v`, or `ALTER ROLE … PASSWORD '…'` as admin |
+| A service role can connect to another service's database | The init script ran without the `REVOKE … FROM PUBLIC` lines | Check `SELECT datname, datacl FROM pg_database;`. An empty `datacl` means defaults (PUBLIC can connect). Then `make reset`. |
 | `Skipping initialization` in the logs | The volume already has data | Expected on every start after the first one |
