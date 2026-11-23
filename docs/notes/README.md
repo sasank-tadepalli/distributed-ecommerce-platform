@@ -11,7 +11,8 @@ The [journal](../distributed-ecommerce-journal.md) records *when* I learned thin
 | [architecture-docs.md](architecture-docs.md) | C4 model, Mermaid, ADRs | Week 1, Day 1 |
 | [java.md](java.md) | Records, interfaces, generics, `Optional`, streams, equality, nested classes, immutability, money | Week 1, Day 2 |
 | [docker.md](docker.md) | Images, containers, volumes, Compose, `.env`, healthchecks, init scripts | Week 1, Day 2 |
-| [postgres.md](postgres.md) | Roles, database ownership, least privilege, `psql` variables | Week 1, Day 2 |
+| [postgres.md](postgres.md) | Roles, ownership, least privilege, `PUBLIC` default privileges, reading ACLs, `psql` variables | Week 1, Days 2–3 |
+| [make.md](make.md) | Rules, `.PHONY`, `$$` escaping across layers, dry runs, confirmation guards | Week 1, Day 3 |
 
 ## How to add a note
 - Add to the existing topic file if one fits. Start a new file only for a genuinely new area (e.g. `spring.md`, `jpa.md`, `kafka.md`).
