@@ -182,7 +182,7 @@ Shared conventions (written down in `docs/db/conventions.md`):
 
 **Auditing (two layers)**
 1. **Row-level columns** filled automatically by Spring Data JPA auditing (`@CreatedBy` etc., with `AuditorAware` reading the JWT subject).
-2. **An `audit_log` table in each service DB** (id, actor_id, actor_roles, action, entity_type, entity_id, before JSONB, after JSONB, ip, user_agent, trace_id, at). It is written **in the same transaction** as the change, so an audit entry can never be lost. It is append-only: the DB role is granted INSERT/SELECT only, with no UPDATE or DELETE.
+2. **An `audit_log` table in each service DB** (id, actor_id, actor_roles, action, entity_type, entity_id, before JSONB, after JSONB, ip, user_agent, trace_id, at). It is written **in the same transaction** as the change, so an audit entry can never be lost. It is append-only: each service gets **two DB roles**, a migration role (owner, used only by Flyway) and an app role (not the owner) that is granted only INSERT/SELECT on `audit_log`, with no UPDATE or DELETE. Two roles are needed because a table's owner always holds every privilege on it, so revoking from the owner doesn't stick.
 3. Later (E3+), stream the audit logs to a central store through Kafka.
 
 ---
