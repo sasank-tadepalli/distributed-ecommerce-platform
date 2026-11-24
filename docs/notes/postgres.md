@@ -45,6 +45,12 @@ What `users_svc` could do in `products_db` **before** the fix:
 
 > 🎯 **Interview:** "Least privilege isn't only about what you grant; it's about what the **defaults already grant**." Separate users looked isolated, but weren't. The only way to know is to **test the negative case**: prove that access is *denied*, not just that it works.
 
+### What isolation on a shared server still doesn't cover
+Even with the `REVOKE`, the three databases share one Postgres **server**:
+- **Shared resources:** connection slots (`max_connections`), CPU, memory and disk. One misbehaving service can starve the others (the **noisy neighbor** problem). Mitigation: per-role connection limits (`ALTER ROLE users_svc CONNECTION LIMIT 20;`), or separate instances in production.
+- **Credentials:** a service must never get the superuser login, which bypasses every check.
+- **Schema per service** (one database, `USAGE`/`CREATE` grants per schema) is a cheaper alternative. Separate databases make cross-service joins impossible and allow moving a database to its own server later without code changes.
+
 ## Reading access privileges (ACLs)
 ```
 products_svc=CTc/products_svc

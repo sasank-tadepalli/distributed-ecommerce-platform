@@ -53,7 +53,7 @@ Status key: ⬜ Not started · 🟡 In progress · ✅ Done · 🔴 Blocked
 |---|---|---|---|---|
 | 1 | 2026-11-15 | Installed SDKMAN + Java 21 (fixed a missing `~/.zshrc` setup). Wrote `.gitignore`. Set up the monorepo skeleton (services, infra, docs). Wrote architecture docs as Mermaid diagrams (C4 model). Started this journal. First commit. | Companies use LTS Java versions only, which is why 21 and not 19. A command like `sdk` can be a shell function that only exists once a startup script has run. In `.gitignore`, the last matching rule wins, so `!.env.example` must come after `.env.*`. Git doesn't track empty folders. Good architecture docs answer one question per diagram. | 2.5 h |
 | 2 | 2026-11-16 → 18 | Ran Postgres 17 in Docker Compose with a named volume, a healthcheck, and the port bound to `127.0.0.1`. Moved all credentials into a gitignored `.env`, with a committed `.env.example` template. Wrote an init script that creates one database per service, each owned by its own non-superuser role, reading passwords via `\getenv` so none are committed. Debugged a stale-volume crash and an env-var name mismatch. Dropped the dedicated Java refresher (Java is now taught when needed) and started `docs/notes/`. | A compose file is **declarative**: it describes desired state, and `up` only changes the difference. `.env` values reach the container in two steps: Compose substitutes `${VAR}` into the YAML, then `environment:` decides what exists inside the container. Init scripts and passwords are **bootstrap config**: they only apply on an empty volume. Volumes outlive compose files: same folder + same volume name = same data. Silent failures (`\getenv` on a missing variable) move the error away from its cause. | 2 h |
-| 3 | | | | |
+| 3 | 2026-11-21 → 24 | Wrote a Makefile as the project's task runner: self-documenting `help`, `up`/`down`/`ps`/`logs`, admin and per-service `psql` targets, a `reset` that only wipes data after an explicit `y`, and **`verify-isolation`**, a CI-ready check that every service role reaches only its own database. Tested the isolation claim, found it was false (`users_svc` could connect to `products_db`), and fixed it with `REVOKE ALL ON DATABASE … FROM PUBLIC`. Proved the check works by breaking isolation on purpose and watching it fail. Corrected the Week 5 audit plan to use separate migration and app roles. | Postgres grants `CONNECT` + `TEMPORARY` on every new database to `PUBLIC` (all roles) by default, and an empty ACL **hides** those defaults. Privileges live on the **object** (the database's ACL), not the role. Authentication (`pg_hba.conf`) and authorization (GRANT/REVOKE) are separate layers. In Make, a single `$` is expanded by Make before the shell runs, and `make -n` shows what the shell will really get. A test must check both directions, and you must see it fail before trusting it. | 1.5 h |
 | 4 | | | | |
 | 5 | | | | |
 | 6 | | | | |
@@ -105,6 +105,20 @@ One question per session, answered out loud first, corrected, then recorded here
 
 *Follow-up an interviewer might ask:* "If containers are disposable, how do you run a database in production?" → Data must live in persistent storage outside the container: a volume backed by a cloud disk (e.g. an AWS EBS volume in Kubernetes via a StatefulSet and a PersistentVolumeClaim), or more commonly a **managed database** (RDS, Cloud SQL) so the provider handles storage, backups and failover.
 
+### Day 3: You've given each microservice its own database user. Is that enough to isolate them? What else could still leak, and how would you prove the isolation actually works?
+
+*Answer:* **No. Separate users are necessary but not sufficient**, because isolation depends just as much on what the **defaults** already grant:
+1. **Default privileges.** Postgres grants `CONNECT` and `TEMPORARY` on every new database to `PUBLIC` (every role). With only separate users and databases, `users_svc` could still connect to `products_db`. The fix is `REVOKE ALL ON DATABASE … FROM PUBLIC`, leaving only the owner.
+2. **What still leaks on a shared server**, even after the revoke:
+   - catalog metadata visible to any connected role (table and column names)
+   - shared resources: connection slots (`max_connections`), CPU, memory and disk. One misbehaving service can starve the others (the "noisy neighbor" problem). Stronger isolation means per-role connection limits, or separate servers/instances in production.
+3. **Credentials.** Services must never use the superuser, which bypasses every check. Each service gets only its own credentials.
+4. **Least privilege inside the database too.** The owner of a table always holds every privilege on it, so an "INSERT-only" rule (e.g. for an append-only audit log) needs a separate non-owner **app role**, with the **migration role** owning the tables.
+
+*How to prove it:* with an **automated negative test**, not a one-off manual check. My `make verify-isolation` connects as every service role to every database. Each role must reach its own database and be **refused** by the others. Checking both directions matters: a refusal-only check would also pass if Postgres were down. It runs without a terminal, so it can run in CI on every change. I also broke isolation on purpose (`GRANT CONNECT … TO users_svc`) to confirm the check fails.
+
+*Follow-up an interviewer might ask:* "Why not just use one database with a schema per service?" → It's possible (schema `USAGE`/`CREATE` grants work the same way), and cheaper. But separate databases make accidental cross-service queries and joins impossible, and they let each service be moved to its own server later without changing code. The trade-off is more connection pools and more things to back up.
+
 <!-- Template:
 ### Day N: <question>
 *Answer:* (core claim → trade-offs → how it applies in this project)
@@ -122,6 +136,8 @@ Every bug, confusing error and "why doesn't this work" moment goes here.
 | 2026-11-15 | `zsh: command not found: sdk` after installing SDKMAN | The installer didn't add its init lines to `~/.zshrc`, so new shells never loaded the `sdk` function | Added `SDKMAN_DIR` and `source …/sdkman-init.sh` to the end of `~/.zshrc` | `sdk` is a shell **function**, not a program on disk. It only exists if a startup script defines it. `source` runs a script inside the current shell; `./script` runs it in a separate one. |
 | 2026-11-18 | Postgres 17 container crashed: *"database files are incompatible with server … initialized by PostgreSQL version 15"*, after logging *"Skipping initialization"* | Compose names volumes `<folder>_<volume>`. An old compose file (deleted, never committed) used `postgres:15` with the same volume name `postgres_data` in the same folder, so the new file **reused** `distributed-ecommerce-platform_postgres_data`. Postgres saw existing data, skipped init, and refused to start because major versions change the on-disk format. | `docker compose down -v` (the old volume held no real data), then `up -d` | Deleting a compose file never deletes its volumes. Check `docker volume ls` when a fresh setup behaves like an old one. Major-version upgrades need `pg_upgrade` or dump/restore. |
 | 2026-11-18 | Init script failed: `syntax error at or near ":"` at `CREATE ROLE users_svc LOGIN PASSWORD :'users_db_pwd'` | `environment:` had `USER_DB_PASSWORD` (missing `S`) on the left side, so the container never got `USERS_DB_PASSWORD`. `\getenv` **silently** did nothing, and `psql` left the unset `:'users_db_pwd'` as literal text, so the error surfaced in the SQL file, not the compose file. | Fixed the name, then `down -v` (a failed init leaves a half-initialized volume that skips init on every restart) and `up -d` | An env var's name must match in three places: `.env`, the left side of `environment:`, and `\getenv`. Silent failures move the error away from its cause, so trace back to where the input came from. Check what a container actually got: `docker compose run --rm postgres env \| cut -d= -f1` |
+| 2026-11-21 | `make reset`: typing `n` (or anything except Enter) would have **deleted all data** | Two bugs. (1) I wrote the shell expression `${answer#[Nn]}` with a single `$`, so **Make** treated it as a Make variable named `answer#[Nn]` and replaced it with an empty string before the shell ran. The check became "is the answer non-empty?". (2) Even if escaped correctly, `${answer#[Nn]}` tests for a leading **n**, so the logic was inverted. | Rewrote it to default to "no": `[ "$$answer" = "y" ] \|\| { echo "Reset cancelled."; exit 1; }`, so only an explicit `y` proceeds | Every layer that uses `$` (Make, host shell, container shell) needs its own escaping. **Always dry-run with `make -n <target>`** before running anything destructive. Destructive confirmations should default to "no". |
+| 2026-11-21 | `users_svc` could connect to `products_db` and `orders_db`, although each service had its own role and database | Every new Postgres database grants `CONNECT` + `TEMPORARY` to `PUBLIC` (all roles) by default. Privileges live on the **database's ACL**, and an **empty** ACL means "defaults apply", which `\l` doesn't display, so it looked fine. On Day 2 I'd only tested that each role could reach its **own** database. | `REVOKE ALL ON DATABASE <db> FROM PUBLIC;` for each database in the init script, then `make reset`. Added `make verify-isolation` to check all 9 role/database combinations. | Least privilege is about what the **defaults** already grant, not just what you grant. Test the **negative** case, and check both directions so the test can't pass when everything is down. |
 | | | | | |
 
 ---
@@ -140,6 +156,10 @@ Significant decisions also get a full ADR in [docs/adr](adr/).
 | 2026-11-17 | Keep concept notes by topic in `docs/notes/` | A reference organized by subject is easier to review than notes by day; the journal keeps the timeline | Notes only in the journal | |
 | 2026-11-17 | `postgres:17-alpine`, pinned to the major version | Current stable major; patch updates are safe, major jumps need a planned upgrade; Alpine keeps the image small | `latest` (unpredictable), Postgres 15 | |
 | 2026-11-17 | One database + one owning non-superuser role per service, passwords from `.env` via `\getenv` | Least privilege; no secrets in committed files | One shared admin user for all databases; passwords hardcoded in SQL | |
+| 2026-11-21 | `REVOKE ALL` (not just `CONNECT`) on each database from `PUBLIC` | Removes CONNECT **and** TEMPORARY, so even an accidental later `GRANT CONNECT` wouldn't allow temp tables | `REVOKE CONNECT` only | |
+| 2026-11-21 | Make as the task runner, with a self-documenting `help` as the default target | Installed everywhere, familiar to every engineer, `make` alone lists all commands | npm-style scripts (no Node in this repo), shell scripts in `scripts/` | |
+| 2026-11-21 | `make verify-isolation`: an automated negative test, checking both directions, fail-fast | Turns the isolation claim into something anyone (and CI) can re-verify in one command | Manual `psql` checks; refusal-only checks (would pass if Postgres were down) | |
+| 2026-11-23 | Two DB roles per service from Week 5: migration (owner, Flyway) + app (minimal grants) | An owner always holds every privilege on its tables, so `audit_log` can't be append-only for its owner | One owner role per service doing both | _to write in Week 5_ |
 | | | | | |
 
 ---
@@ -165,6 +185,15 @@ One-line definitions as a quick index. Full explanations are in [docs/notes](not
 | Bootstrap config | Settings that only apply when something is first created. Afterwards, the stored state wins over the config. | Postgres passwords and init scripts | 1 |
 | Least privilege | Give each component only the access it needs, so a compromise or bug stays contained. | Per-service non-superuser DB roles | 1 |
 | Port binding to `127.0.0.1` | Binds a published port to the loopback interface only. The default (`0.0.0.0`) is every interface, i.e. the whole network. | `ports: "127.0.0.1:5432:5432"` | 1 |
+| Make (task runner) | Turns long commands into named targets (`make up`), like `package.json` scripts. Recipe lines need a TAB; `.PHONY` marks targets as commands, not files. | `Makefile` | 1 |
+| `make -n` | Dry run: prints the exact commands after Make's substitution, without running them. | Catching the `reset` bug | 1 |
+| `PUBLIC` | Pseudo-role meaning every role, current and future. Every new database grants it `CONNECT` + `TEMPORARY` by default. | `REVOKE ALL … FROM PUBLIC` in the init script | 1 |
+| ACL | The privilege list stored **on an object**. `grantee=privileges/grantor`; an empty grantee = PUBLIC; an empty ACL = defaults apply. | `SELECT datname, datacl FROM pg_database` | 1 |
+| GRANT / REVOKE | Give / take privileges on an object (database, schema, table, column, sequence, function). Access is layered: CONNECT → USAGE → SELECT. | Database isolation; future app-role grants | 1 |
+| Authentication vs authorization | Authentication = who are you (`pg_hba.conf`). Authorization = what may you do (GRANT/REVOKE). Separate layers. | `trust` inside the container, yet CONNECT still denied | 1 |
+| `pg_hba.conf` | Postgres's authentication rules, first match wins. The Docker image trusts connections from inside the container and requires passwords from outside. | Why `make psql-users` needs no password | 1 |
+| Temporary table | A table visible only to the creating session and dropped when the session ends. | Why the `TEMPORARY` privilege matters | 1 |
+| Negative test | A test that proves something is **denied**. Must also check the positive case, and must be seen failing once. | `make verify-isolation` | 1 |
 | | | | |
 
 Coming up: dependency injection, JPA/Hibernate, Flyway migrations, JWT/JWKS, RBAC, optimistic locking, cache-aside, idempotency, transactional outbox, circuit breaker, consumer groups, DLQ, RED metrics, distributed tracing, saga, CQRS.
@@ -234,4 +263,4 @@ Read alongside the week that uses it, not all up front.
 
 ---
 
-*Last updated: 2026-11-18 · Current: Week 1, Day 2 done → next: Day 3 (Makefile + proving database isolation)*
+*Last updated: 2026-11-24 · Current: Week 1, Day 3 done → next: Day 4 (Gradle root build, version catalog and wrapper)*
